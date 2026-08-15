@@ -19,8 +19,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.mad_mini_project.util.SyntaxVisualTransformation
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -33,6 +33,7 @@ fun EditorScreen(viewModel: EditorViewModel) {
     var showSaveAsDialog by remember { mutableStateOf(false) }
     var showOpenDialog by remember { mutableStateOf(false) }
     var showRecentDialog by remember { mutableStateOf(false) }
+    var showVersionDialog by remember { mutableStateOf(false) }
     var saveAsName by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -143,6 +144,14 @@ fun EditorScreen(viewModel: EditorViewModel) {
                                 showMenu = false
                                 viewModel.loadRecentFiles()
                                 showRecentDialog = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Version History (Diff)") },
+                            onClick = {
+                                showMenu = false
+                                viewModel.loadVersionHistory()
+                                showVersionDialog = true
                             }
                         )
                         HorizontalDivider()
@@ -333,15 +342,22 @@ fun EditorScreen(viewModel: EditorViewModel) {
                     .fillMaxWidth()
                     .padding(8.dp)
             ) {
+                val visualTransformation = remember(viewModel.searchQuery, viewModel.searchMatchIndex, viewModel.isSearchOpen) {
+                    SyntaxVisualTransformation(
+                        searchQuery = if (viewModel.isSearchOpen) viewModel.searchQuery else "",
+                        currentMatchIndex = if (viewModel.matchCount > 0) (viewModel.searchMatchIndex % viewModel.matchCount) else 0
+                    )
+                }
+
                 if (viewModel.isWordWrap) {
                     OutlinedTextField(
                         value = viewModel.textContent,
                         onValueChange = { viewModel.onTextChange(it) },
                         readOnly = viewModel.isReadOnly,
-                        visualTransformation = VisualTransformation.None,
+                        visualTransformation = visualTransformation,
                         textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace),
                         modifier = Modifier.fillMaxSize(),
-                        placeholder = { Text("Type text here...") }
+                        placeholder = { Text("Type Kotlin code or Markdown text here...") }
                     )
                 } else {
                     val horizontalScrollState = rememberScrollState()
@@ -354,12 +370,12 @@ fun EditorScreen(viewModel: EditorViewModel) {
                             value = viewModel.textContent,
                             onValueChange = { viewModel.onTextChange(it) },
                             readOnly = viewModel.isReadOnly,
-                            visualTransformation = VisualTransformation.None,
+                            visualTransformation = visualTransformation,
                             textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace),
                             modifier = Modifier
                                 .fillMaxHeight()
                                 .widthIn(min = 800.dp),
-                            placeholder = { Text("Type text here...") }
+                            placeholder = { Text("Type Kotlin code or Markdown text here...") }
                         )
                     }
                 }
@@ -473,6 +489,17 @@ fun EditorScreen(viewModel: EditorViewModel) {
                 TextButton(onClick = { showRecentDialog = false }) {
                     Text("Close")
                 }
+            }
+        )
+    }
+
+    // Version History Dialog (Room & Diff)
+    if (showVersionDialog) {
+        DiffViewerDialog(
+            versions = viewModel.versionHistory,
+            onDismiss = { showVersionDialog = false },
+            onRestoreVersion = { ver ->
+                viewModel.restoreVersion(ver)
             }
         )
     }

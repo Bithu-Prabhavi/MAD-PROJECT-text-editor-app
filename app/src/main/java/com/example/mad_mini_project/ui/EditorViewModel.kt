@@ -8,7 +8,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mad_mini_project.data.AppDatabase
+import com.example.mad_mini_project.data.DocumentVersion
 import com.example.mad_mini_project.data.RecentFile
+import com.example.mad_mini_project.util.DiffUtilsHelper
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -16,6 +20,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     private val db = AppDatabase.getDatabase(application)
     private val dao = db.editorDao()
+    private val tempFile = File(application.filesDir, "temp_autosave.txt")
 
     var textContent by mutableStateOf("")
         private set
@@ -41,11 +46,34 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     var searchMatchIndex by mutableIntStateOf(0)
     var statusMessage by mutableStateOf<String?>(null)
 
-    // Room list for Recent Files
+    fun openSearch(replaceMode: Boolean = false) {
+        isReplaceMode = replaceMode
+        isSearchOpen = true
+    }
+
+    fun previousMatch() {
+        val matches = getSearchMatches()
+        if (matches.isEmpty()) return
+        val total = matches.size
+        searchMatchIndex = (searchMatchIndex - 1 + total) % total
+    }
+
+    fun nextMatch() {
+        val matches = getSearchMatches()
+        if (matches.isEmpty()) return
+        val total = matches.size
+        searchMatchIndex = (searchMatchIndex + 1) % total
+    }
+
+    // Room lists
     var recentFiles by mutableStateOf<List<RecentFile>>(emptyList())
+        private set
+    var versionHistory by mutableStateOf<List<DocumentVersion>>(emptyList())
         private set
 
     init {
+        restoreTempAutoSave()
+        startAutoSaveTimer()
         loadRecentFiles()
     }
 
@@ -99,25 +127,6 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     // --- Search & Replace ---
-    fun openSearch(replaceMode: Boolean = false) {
-        isReplaceMode = replaceMode
-        isSearchOpen = true
-    }
-
-    fun previousMatch() {
-        val matches = getSearchMatches()
-        if (matches.isEmpty()) return
-        val total = matches.size
-        searchMatchIndex = (searchMatchIndex - 1 + total) % total
-    }
-
-    fun nextMatch() {
-        val matches = getSearchMatches()
-        if (matches.isEmpty()) return
-        val total = matches.size
-        searchMatchIndex = (searchMatchIndex + 1) % total
-    }
-
     fun replaceNext() {
         val matches = getSearchMatches()
         if (matches.isEmpty()) return
@@ -132,6 +141,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         )
         onTextChange(updatedText)
 
+        // Advance to next match position
         val nextMatches = getSearchMatches()
         searchMatchIndex = if (nextMatches.isNotEmpty()) {
             currentIndex % nextMatches.size
@@ -153,6 +163,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         textContent = ""
         currentFilePath = null
         currentFileName = "Untitled.txt"
+        versionHistory = emptyList()
         statusMessage = "New file created"
     }
 
@@ -171,6 +182,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 dao.insertRecentFile(RecentFile(file.absolutePath, file.name))
                 dao.trimRecentFiles()
                 loadRecentFiles()
+                loadVersionHistory(file.absolutePath)
             }
         } catch (e: Exception) {
             statusMessage = "Error opening file: ${e.localizedMessage}"
@@ -184,10 +196,30 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             currentFilePath = file.absolutePath
             currentFileName = file.name
 
+            // Delete temporary autosave file upon successful manual save
+            if (tempFile.exists()) {
+                tempFile.delete()
+            }
+
             viewModelScope.launch {
+                // Fetch existing versions chronologically (oldest to newest)
+                val existingVersions = dao.getVersionsForFile(file.absolutePath)
+
+                val patchString: String = if (existingVersions.isEmpty()) {
+                    // Version 1: Store complete base document
+                    textContent
+                } else {
+                    // Version N: Reconstruct latest document text and compute unified diff patch
+                    val latestVersionText = reconstructTextFromVersions(existingVersions, existingVersions.last().id)
+                    DiffUtilsHelper.createDiff(latestVersionText, textContent, file.name)
+                }
+
                 dao.insertRecentFile(RecentFile(file.absolutePath, file.name))
                 dao.trimRecentFiles()
+                dao.insertVersion(DocumentVersion(filePath = file.absolutePath, patchString = patchString))
+
                 loadRecentFiles()
+                loadVersionHistory(file.absolutePath)
             }
             statusMessage = "Saved ${file.name}"
         } catch (e: Exception) {
@@ -195,10 +227,63 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // --- Auto-Save & Recovery ---
+    private fun startAutoSaveTimer() {
+        viewModelScope.launch {
+            while (isActive) {
+                delay(10000) // 10 seconds
+                try {
+                    if (textContent.isNotEmpty()) {
+                        tempFile.writeText(textContent)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    private fun restoreTempAutoSave() {
+        try {
+            if (tempFile.exists() && tempFile.length() > 0) {
+                textContent = tempFile.readText()
+                statusMessage = "Restored auto-saved draft"
+            }
+        } catch (_: Exception) {}
+    }
+
     // --- Room Database Queries ---
     fun loadRecentFiles() {
         viewModelScope.launch {
             recentFiles = dao.getRecentFiles()
+        }
+    }
+
+    fun loadVersionHistory(path: String? = currentFilePath) {
+        if (path == null) return
+        viewModelScope.launch {
+            versionHistory = dao.getVersionsForFile(path).reversed() // Display newest first in UI
+        }
+    }
+
+    // Reconstruct document text up to target version ID
+    private fun reconstructTextFromVersions(versionsAsc: List<DocumentVersion>, targetVersionId: Int): String {
+        if (versionsAsc.isEmpty()) return ""
+        // Version 1 holds the full base text
+        var text = versionsAsc.first().patchString
+        for (i in 1 until versionsAsc.size) {
+            val v = versionsAsc[i]
+            text = DiffUtilsHelper.applyDiff(text, v.patchString)
+            if (v.id == targetVersionId) break
+        }
+        return text
+    }
+
+    fun restoreVersion(version: DocumentVersion) {
+        val path = currentFilePath ?: return
+        viewModelScope.launch {
+            val versionsAsc = dao.getVersionsForFile(path)
+            val reconstructed = reconstructTextFromVersions(versionsAsc, version.id)
+            onTextChange(reconstructed)
+            statusMessage = "Restored version snapshot"
         }
     }
 

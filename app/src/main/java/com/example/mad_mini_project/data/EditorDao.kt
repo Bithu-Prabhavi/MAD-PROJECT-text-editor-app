@@ -15,4 +15,10 @@ interface EditorDao {
 
     @Query("DELETE FROM recent_files WHERE filePath NOT IN (SELECT filePath FROM recent_files ORDER BY lastOpened DESC LIMIT 20)")
     suspend fun trimRecentFiles()
+
+    @Insert
+    suspend fun insertVersion(version: DocumentVersion): Long
+
+    @Query("SELECT * FROM document_versions WHERE filePath = :filePath ORDER BY timestamp ASC")
+    suspend fun getVersionsForFile(filePath: String): List<DocumentVersion>
 }
