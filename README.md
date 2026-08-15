@@ -1,12 +1,8 @@
 # IS2205 Modern Mobile Text Editor
 
-## Sprint 1 – Member 1
+## Sprint 2 – Member 2
 
-### Contribution
-
-File Management & Recent Files
-
-### Features
+### Previous Features
 
 - New File
 - Open File
@@ -14,13 +10,19 @@ File Management & Recent Files
 - Save As
 - Recent Files
 
+### New Contribution
+
+- Word Wrap
+- Undo
+- Redo
+- Search
+- Search & Replace
+- Read-Only
+
 ### Main Files
 
 - `EditorScreen.kt`
 - `EditorViewModel.kt`
-- `RecentFile.kt`
-- `EditorDao.kt`
-- `AppDatabase.kt`
 
 ### Build
 
