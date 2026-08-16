@@ -81,6 +81,7 @@ app/src/main/java/com/example/mad_mini_project/
 4. Run the app on an emulator or physical device (API 24+).
    
    APK Build / Release:  https://drive.google.com/file/d/1dGsGvaGoEz2vuFnzSU-jVl8BEXG5O3Dq/view?usp=sharing
+                         https://github.com/Bithu-Prabhavi/MAD-PROJECT-text-editor-app/releases/tag/release-apk-v1
 
 ## Team
 
