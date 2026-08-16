@@ -82,11 +82,10 @@ app/src/main/java/com/example/mad_mini_project/
 
 ## Team
 
-- Member 1 — _role/contribution_
-- Member 2 — _role/contribution_
-- Member 3 — _role/contribution_
+- T.W Abeysekera - 24020036
+- B.P Kandanage - 24020559
+- M.L Basnayaka - 24020141
 
 ## Course
 
-IS2205 — Mobile Application Design & Development, University of Colombo School of
-Computing (UCSC).
+IS2205 — Mobile Application Design & Development, University of Colombo School of Computing (UCSC).
