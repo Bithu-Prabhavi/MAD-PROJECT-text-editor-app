@@ -1,4 +1,4 @@
-# MAD Mini-Project — Mobile Text Editor with Incremental Version Control
+# MAD Mini-Project — Mobile Text Editor
 
 IS2205: Mobile Application Design & Development — Mini-Project
 
