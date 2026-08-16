@@ -79,6 +79,8 @@ app/src/main/java/com/example/mad_mini_project/
 2. Open the project in Android Studio.
 3. Let Gradle sync and download dependencies.
 4. Run the app on an emulator or physical device (API 24+).
+   
+   APK Build / Release:  https://drive.google.com/file/d/1dGsGvaGoEz2vuFnzSU-jVl8BEXG5O3Dq/view?usp=sharing
 
 ## Team
 
